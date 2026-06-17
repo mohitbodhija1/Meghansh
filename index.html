@@ -94,16 +94,119 @@ waitForButton('.popup-enter', function(enterButton) {
   const audioControl = document.getElementById('audio-control');
   const iconPlay = document.getElementById('icon-play');
   const iconPause = document.getElementById('icon-pause');
-  enterButton.addEventListener('click', function() {
+  let hasStartedFromOffset = false;
+  let invitationStarted = false;
+
+  function startInvitation() {
+    if (invitationStarted) return;
+    invitationStarted = true;
+
     audio.muted = false;
-    audio.currentTime = 0;
+    if (!hasStartedFromOffset) {
+      audio.currentTime = 0;
+      hasStartedFromOffset = true;
+    }
     audio.play().then(() => {
       iconPlay.style.display = 'none';
       iconPause.style.display = 'block';
     }).catch(err => console.log('Audio play failed:', err));
     audioControl.style.visibility = 'visible';
     audioControl.style.opacity = '1';
+
+    // Force play background video(s)
+    playAndMuteVideos();
+  }
+
+  function playAndMuteVideos() {
+    const videos = document.querySelectorAll('video');
+    videos.forEach(video => {
+      video.muted = true;
+      video.playsInline = true;
+      video.setAttribute('playsinline', '');
+      video.setAttribute('muted', '');
+      video.loop = true;
+      video.setAttribute('loop', '');
+      
+      // Force loading state reset if needed
+      if (video.paused || video.ended || video.readyState < 2) {
+        video.currentTime = 0;
+      }
+      
+      video.play()
+        .then(() => console.log('Video playing successfully'))
+        .catch(err => {
+          console.log('Video initial play failed, reloading:', err);
+          video.load();
+          video.play().catch(e => console.log('Video play after load failed:', e));
+        });
+    });
+  }
+
+  // Bind to both click and touchstart to ensure immediate response on mobile
+  enterButton.addEventListener('click', startInvitation);
+  enterButton.addEventListener('touchstart', startInvitation);
+
+  // Also catch click/touchstart on the text element "Click to open" just in case
+  const textButton = document.querySelector('[data-elem-id="1773926384566"]');
+  if (textButton) {
+    textButton.addEventListener('click', startInvitation);
+    textButton.addEventListener('touchstart', startInvitation);
+    textButton.style.cursor = 'pointer';
+  }
+
+  // Wake up video on subsequent interactions if it gets paused by the browser
+  const handleInteraction = () => {
+    if (hasStartedFromOffset) {
+      const videos = document.querySelectorAll('video');
+      videos.forEach(video => {
+        if (video.paused) {
+          video.play().catch(err => console.log('Interaction video play failed:', err));
+        }
+      });
+    }
+  };
+  document.addEventListener('click', handleInteraction);
+  document.addEventListener('touchstart', handleInteraction);
+
+  // Visibility change wake up
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && hasStartedFromOffset) {
+      const videos = document.querySelectorAll('video');
+      videos.forEach(video => {
+        video.play().catch(err => console.log('Visibility wake up video play failed:', err));
+      });
+    }
   });
+
+  // Setup loop recovery listeners for all videos
+  const videos = document.querySelectorAll('video');
+  videos.forEach(video => {
+    video.addEventListener('ended', () => {
+      if (hasStartedFromOffset) {
+        video.currentTime = 0;
+        video.play().catch(err => console.log('Video ended loop recovery failed:', err));
+      }
+    });
+    // Pause event listener backup
+    video.addEventListener('pause', () => {
+      if (hasStartedFromOffset) {
+        video.play().catch(err => console.log('Video pause recovery failed:', err));
+      }
+    });
+  });
+
+  // Periodic safeguard check (every 500ms) to ensure video stays playing
+  setInterval(() => {
+    if (hasStartedFromOffset) {
+      const videos = document.querySelectorAll('video');
+      videos.forEach(video => {
+        if (video.paused) {
+          video.play().catch(err => {});
+        }
+      });
+    }
+  }, 500);
+
   audioControl.addEventListener('click', function() {
     if (audio.paused) {
       audio.play();
