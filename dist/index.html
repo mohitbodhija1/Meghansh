@@ -142,11 +142,11 @@ waitForButton('.popup-enter', function(enterButton) {
     });
   }
 
-  // Bind to both click and touchstart to ensure immediate response on mobile
-  enterButton.addEventListener('click', startInvitation);
-  enterButton.addEventListener('touchstart', startInvitation);
 
-  // Also catch click/touchstart on the text element "Click to open" and forward to enterButton
+  // Bind to click event
+  enterButton.addEventListener('click', startInvitation);
+
+  // Also catch click on the text element "Click to open" and forward to enterButton
   const textButton = document.querySelector('[data-elem-id="1773926384566"]');
   if (textButton) {
     const handleTextClick = (e) => {
@@ -154,7 +154,6 @@ waitForButton('.popup-enter', function(enterButton) {
       enterButton.click();
     };
     textButton.addEventListener('click', handleTextClick);
-    textButton.addEventListener('touchstart', handleTextClick);
     textButton.style.cursor = 'pointer';
   }
 
